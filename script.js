@@ -5,13 +5,14 @@ var pageOnReady = {
 }
 var sessionArray = null;
 var requestSuccess = {};
+var isDebugMode = false;
 
 function foot_inner() {
     formatDebugPermissionView();
     preventLinkClickDebugInfo();
 }
 
-function debugShowRequestPermission(){
+function debugShowRequestPermission(e){
     $(document).ajaxComplete(function(event, jqxhr, settings) {
         var url = settings.url.replace(/\/[0-9]+/, "")
         if(pageOnReady.hasOwnProperty(url)) pageOnReady[url]();
@@ -31,65 +32,80 @@ function debugShowRequestPermission(){
     });
 }
 
-function debugPermissionBtn() {
-    $.get("dev/removerPermissoes", function(e){
-        var html = "<button id='btn-debug-permission' class='btn btn-primary btn-xs' title='{{desc}}'>{{txt}}</button>";
-        var desc = "";
-        if(e.status) {
-            desc = "Habilitar Permissões";
-            icon = "thumbs-o-up";
-        } else {
-            desc = "Desabilitar Permissões";
-            icon = "thumbs-o-down"
-        }
-        addLeftBtn('permission', desc, icon, function(){
-            var btn = $(this);
-            btn.html("<i class='fa fa-lg fa-fw fa-refresh'></i> Carregando...");
-            btn.prop("disabled", true);
-            $.post("dev/removerPermissoes", {'change':true}, function(e){
-                if(e.status) {
-                    btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-up'></i> Habilitar Permissões");
-                } else {
-                    btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-down'></i> Desabilitar Permissões");
-                }
-                btn.prop("disabled", false);
-            });
-        }, false, "#sub-group-debug-lti ul");
-        $.get("dev/permList", function(e){
-            addLeftBtn('restart', "Restaurar Permissões", "undo", function(){
-                restaurarPermDev("read");
-                restaurarPermDev("write");
+function debugPermissionBtn(e) {
+    if(!isDebugMode) return;
+    $.ajax({
+        dataType: "json",
+        url: "dev/removerPermissoes",
+        success: function(e) {
+            var html = "<button id='btn-debug-permission' class='btn btn-primary btn-xs' title='{{desc}}'>{{txt}}</button>";
+            var desc = "";
+            if(e.status) {
+                desc = "Habilitar Permissões";
+                icon = "thumbs-o-up";
+            } else {
+                desc = "Desabilitar Permissões";
+                icon = "thumbs-o-down"
+            }
+            addLeftBtn('permission', desc, icon, function(){
+                var btn = $(this);
+                btn.html("<i class='fa fa-lg fa-fw fa-refresh'></i> Carregando...");
+                btn.prop("disabled", true);
+                $.ajax({
+                    dataType: "json",
+                    url: "dev/removerPermissoes",
+                    data: {'change':true},
+                    success: function(e) {
+                        if(e.status) {
+                            btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-up'></i> Habilitar Permissões");
+                        } else {
+                            btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-down'></i> Desabilitar Permissões");
+                        }
+                        btn.prop("disabled", false);
+                    }
+                });
             }, false, "#sub-group-debug-lti ul");
-            addLeftBtn('perm-list', "Permissões", "list-ul", function(){
-                $('#list-permissions').modal();
-                var active = (($('#content .debug-permission:nth(0)').size())?$('#content .debug-permission:nth(0)').html().replace(/[()]+/g, "").replace(/<span[^>]+>/g, "").replace(/<\/span>/g, "|").replace(/(\|)?:.*/, ""):null);
-                $('#list-permissions label.checkbox').removeClass('active');
-                if(active) {
-                    if(active.match(/|/)) {
-                        $.each(active.split('|'), function(idx, item){
-                            $('#list-permissions label.checkbox[data-desc="' + item + '"]').addClass('active');
-                        });
-                    } else {
-                        $('#list-permissions label.checkbox[data-desc="' + active + '"]').addClass('active');
+
+            $.ajax({
+                dataType: "json",
+                url: "dev/permList",
+                success: function(e) {
+                    addLeftBtn('restart', "Restaurar Permissões", "undo", function(){
+                        restaurarPermDev("read");
+                        restaurarPermDev("write");
+                    }, false, "#sub-group-debug-lti ul");
+                    addLeftBtn('perm-list', "Permissões", "list-ul", function(){
+                        $('#list-permissions').modal();
+                        var active = (($('#content .debug-permission:nth(0)').size())?$('#content .debug-permission:nth(0)').html().replace(/[()]+/g, "").replace(/<span[^>]+>/g, "").replace(/<\/span>/g, "|").replace(/(\|)?:.*/, ""):null);
+                        $('#list-permissions label.checkbox').removeClass('active');
+                        if(active) {
+                            if(active.match(/|/)) {
+                                $.each(active.split('|'), function(idx, item){
+                                    $('#list-permissions label.checkbox[data-desc="' + item + '"]').addClass('active');
+                                });
+                            } else {
+                                $('#list-permissions label.checkbox[data-desc="' + active + '"]').addClass('active');
+                            }
+                        }
+                    }, false, "#sub-group-debug-lti ul");
+                    $('#main').append(e.html);
+                    $('body').append(e.script);
+                    $.each(e.read, function (idx, key){
+                        $('#list-permissions .read input[name="'+key+'-read"]').prop('checked', true);
+                    });
+                    $.each(e.write, function (idx, key){
+                        $('#list-permissions .write input[name="'+key+'-write"]').prop('checked', true);
+                    });
+                    $('#list-permissions .read').data('perm-padrao', e.padrao.read);
+                    $('#list-permissions .write').data('perm-padrao', e.padrao.write);
+                    if(Object.values(e.padrao.read).length == e.read.length && Object.values(e.padrao.write).length == e.write.length) {
+                        $('#sub-debug-restart a').data('cursor', $('#sub-debug-restart a').css('cursor'));
+                        $('#sub-debug-restart a').css('cursor', 'not-allowed');
+                        $('#sub-debug-restart a').css('opacity', .5);
                     }
                 }
-            }, false, "#sub-group-debug-lti ul");
-            $('#main').append(e.html);
-            $('body').append(e.script);
-            $.each(e.read, function (idx, key){
-                $('#list-permissions .read input[name="'+key+'-read"]').prop('checked', true);
             });
-            $.each(e.write, function (idx, key){
-                $('#list-permissions .write input[name="'+key+'-write"]').prop('checked', true);
-            });
-            $('#list-permissions .read').data('perm-padrao', e.padrao.read);
-            $('#list-permissions .write').data('perm-padrao', e.padrao.write);
-            if(Object.values(e.padrao.read).length == e.read.length && Object.values(e.padrao.write).length == e.write.length) {
-                $('#sub-debug-restart a').data('cursor', $('#sub-debug-restart a').css('cursor'));
-                $('#sub-debug-restart a').css('cursor', 'not-allowed');
-                $('#sub-debug-restart a').css('opacity', .5);
-            }
-        });
+        }
     });
 }
 
@@ -249,28 +265,23 @@ function request(url, method, data, success, showNofify) {
 }
 
 function updateSessionVar() {
-    $.get("dev/getSession", function(e){
-        sessionArray = {};
-        $.each(e, function(key, value){
-            sessionArray[key] = value;
-        });
-        console.log("update session var");
-        console.dir(sessionArray);
-        if(typeof updateSessionVarCallback === 'function') updateSessionVarCallback(e);
+    $.ajax({
+        dataType: "json",
+        url: "dev/getSession",
+        success: function(e) {
+            sessionArray = {};
+            $.each(e, function(key, value){
+                sessionArray[key] = value;
+            });
+            console.log("update session var");
+            console.dir(sessionArray);
+            isDebugMode = (typeof e.dev_habilitar !== "undefined");
+            if(typeof updateSessionVarCallback === 'function') updateSessionVarCallback(e);
+        }
     });
 }
 
 function addBtnViewPerm(e) {
-    var showPerm = ((e.hasOwnProperty("dev_show_perm") && e.dev_show_perm)?e.dev_show_perm:false);
-    addLeftBtn('show-perm', ((showPerm)?"Hide Perm":"Show Perm"), ((showPerm)?"low-vision":"list-alt"), function(){
-        var btn = $(this);
-        if(btn.text().trim() == "Show Perm") {
-            setSession("dev_show_perm", true, function changeShowPerm(){ btn.html("<i class='fa fa-lg fa-fw fa-low-vision'></i> Hide Perm"); });
-        } else {
-            removeSession("dev_show_perm", function changeShowPerm(){ btn.html("<i class='fa fa-lg fa-fw fa-list-alt'></i> Show Perm"); });
-        }
-    }, false, "#sub-group-debug-lti ul");
-
     var hDevMode = ((e.hasOwnProperty("dev_habilitar") && e.dev_habilitar)?e.dev_habilitar:false);
     addLeftBtn('enable-dev-mode', ((hDevMode)?"Desabilitar DEV Mode":"Habilitar DEV Mode"), ((hDevMode)?"power-off":"bug"), function(){
         var btn = $(this);
@@ -280,10 +291,24 @@ function addBtnViewPerm(e) {
             removeSession("dev_habilitar", function changeShowPerm(){ btn.html("<i class='fa fa-lg fa-fw fa-bug'></i> Habilitar DEV Mode"); });
         }
     }, false, "#sub-group-debug-lti ul");
+
+    if(!isDebugMode) return;
+
+    var showPerm = ((e.hasOwnProperty("dev_show_perm") && e.dev_show_perm)?e.dev_show_perm:false);
+    addLeftBtn('show-perm', ((showPerm)?"Hide Perm":"Show Perm"), ((showPerm)?"low-vision":"list-alt"), function(){
+        var btn = $(this);
+        if(btn.text().trim() == "Show Perm") {
+            setSession("dev_show_perm", true, function changeShowPerm(){ btn.html("<i class='fa fa-lg fa-fw fa-low-vision'></i> Hide Perm"); });
+        } else {
+            removeSession("dev_show_perm", function changeShowPerm(){ btn.html("<i class='fa fa-lg fa-fw fa-list-alt'></i> Show Perm"); });
+        }
+    }, false, "#sub-group-debug-lti ul");
 }
 
 function updateSessionVarCallback(e) {
     addBtnViewPerm(e);
+    debugPermissionBtn(e);
+    debugShowRequestPermission(e);
 }
 
 $('head').append('<link rel="stylesheet" type="text/css" href="https://s3.amazonaws.com/dev.lti.net.br/paulo/debug/style.css">');

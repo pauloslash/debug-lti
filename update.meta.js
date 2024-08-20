@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Debug LTI
 // @namespace    http://paulo.lti.net.br/
-// @version      2024-08-16.1
+// @version      2024-08-20
 // @description  Ferramentas para auxiliar nos teste
 // @author       pauloslash
 // @updateURL    https://raw.githubusercontent.com/pauloslash/debug-lti/master/update.meta.js

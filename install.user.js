@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Debug LTI
 // @namespace    http://paulo.lti.net.br/
-// @version      2024-08-16.1
+// @version      2024-08-20
 // @description  Ferramentas para auxiliar nos teste
 // @author       pauloslash
 // @updateURL    https://raw.githubusercontent.com/pauloslash/debug-lti/master/update.meta.js
@@ -41,14 +41,24 @@
         });
     });
     addLeftBtn('show-log', "Ultimas Alterações", "eye", function(){
-        $.get("debug/lastChanges", function(e){
-            $('#left-panel nav ul').prepend(btnViewChanges);
-        }).fail(function(e){
-            if(e.status == 404) leftBtnStatus("#sub-debug-show-log", false);
+        $.ajax({
+            dataType: "json",
+            url: "dev/lastChanges",
+            success: function(e) {
+                $('#debug-show-logModal .modal-body').html("<table class='table' style='overflow: auto;display: block;'><thead></thead><tbody></tbody></table>");
+                var html = "<tr><th>New</th><th>Old</th><th>#</th><th>Usuário</th><th>Entidade</th><th>Entidade ID</th><th>IP</th><th>Ação</th><th>Data Registro</th></tr>";
+                $('#debug-show-logModal .modal-body table thead').append(html);
+                $.each(e.entities, function(idx, item){
+                    var html = "<tr><td><pre>"+JSON.stringify(item.new, null, 2)+"</pre></td><td><pre>"+JSON.stringify(item.old, null, 2)+"</pre></td><td>"+item.id+"</td><td>"+((item.usuario_id)?"Usuário":"Sistema")+"</td><td>"+item.entidade+"</td><td>"+item.entidadeId+"</td><td>"+item.ip+"</td><td>"+item.acao+"</td><td>"+item.dataRegistro+"</td></tr>";
+                    $('#debug-show-logModal .modal-body table tbody').append(html);
+                });
+                $('#debug-show-logModal .modal-dialog').css("width", "1500px");
+            },
+            error: function(e) {
+                if(e.status == 404) leftBtnStatus("#sub-debug-show-log", false);
+            }
         });
     }, true, "#sub-group-debug-lti ul");
-    debugPermissionBtn();
-    debugShowRequestPermission();
     addLeftBtn('refresh', "Refresh", "refresh", function(){
         var param = "?";
         if(location.href.includes("?")) {
