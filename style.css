@@ -36,3 +36,13 @@ label>.debug-permission { float: none; }
     border-radius: 5px;
     padding: 1px 3px;
 }
+#content .tiles > span {
+    min-width: 350px;
+    min-height: 65px;
+    margin: -5px 0 30px 15px;
+}
+#left-panel ul li > span.debug-permission {
+    min-height: 30px;
+    float: none;
+    margin-right: initial;
+}

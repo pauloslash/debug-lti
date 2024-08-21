@@ -7,7 +7,9 @@ function addModal(id_modal, label, conteudo, retorna) {
     };
     $('#main').append(modalTemplate.replace(/{{:(\w+)}}/g, (match, p1) => replace[p1] || match));
     $('#debug-'+id_modal+'Modal').on('shown.bs.modal', function() {
-        $(this).find('.modal-body').html("Carregando...");
+        if(!$(this).find('.modal-body').data('ignore-clear')) {
+            $(this).find('.modal-body').html("Carregando...");
+        }
     }) ;
 }
 function addLeftBtn(id_btn, label, icon, fnt, add_modal, local) {
@@ -26,6 +28,11 @@ function addLeftBtn(id_btn, label, icon, fnt, add_modal, local) {
     }
     $("#sub-debug-"+id_btn+" a").click(fnt);
     if(add_modal) addModal(id_btn, label);
+
+    var funcIdx = id_btn.replace(/-([a-z])/g, function(match, p1) {
+        return p1.toUpperCase();
+    });
+    if(typeof execAfterAddBtn[funcIdx] === 'function') execAfterAddBtn[funcIdx]();
 }
 function addLeftGroupBtn(id_btn, label, fnt) {
     var replace = {
@@ -46,4 +53,54 @@ function leftBtnStatus(seletor, enable) {
         $(seletor).find('a').css('cursor', 'not-allowed');
         $(seletor).find('a').css('opacity', .5);
     }
+}
+
+function post(url, data, success, showNofify) {
+    showNofify = ((typeof showNofify == 'undefined')?true:showNofify);
+    request(url, "POST", data, success, showNofify)
+}
+
+function get(url, data, success, showNofify, dataType) {
+    showNofify = ((typeof showNofify == 'undefined')?true:showNofify);
+    request(url, "GET", data, success, showNofify, dataType)
+}
+
+function request(url, method, data, success, showNofify, dataType) {
+    showNofify = ((typeof showNofify == 'undefined')?true:showNofify);
+    dataType = dataType || "json";
+    $.ajax({
+        dataType: dataType,
+        url: url,
+        data: data,
+        method: method,
+        success: function (dados) {
+            if(typeof requestSuccess[success.name] === 'function') {
+                if(dados.hasOwnProperty("erro")) {
+                    requestSuccess[success.name](dados.erro, dados);
+                } else {
+                    requestSuccess[success.name](e);
+                }
+            }
+            if(success) success(dados);
+            if(showNofify) {
+                if (dados.erro) {
+                    $.bigBox({
+                        title: "Aviso!",
+                        content: dados.mensagem,
+                        color: "#C46A69",
+                        timeout: 7000,
+                        icon: "fa fa-warning shake animated"
+                    });
+                } else {
+                    $.smallBox({
+                        title: "Sucesso",
+                        content: dados.mensagem,
+                        color: "#739E73",
+                        timeout: 3000,
+                        icon: "fa fa-check"
+                    });
+                }
+            }
+        }
+    });
 }

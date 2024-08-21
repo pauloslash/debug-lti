@@ -5,6 +5,7 @@ var pageOnReady = {
 }
 var sessionArray = null;
 var requestSuccess = {};
+var execAfterAddBtn = {}
 var isDebugMode = false;
 
 function foot_inner() {
@@ -51,18 +52,13 @@ function debugPermissionBtn(e) {
                 var btn = $(this);
                 btn.html("<i class='fa fa-lg fa-fw fa-refresh'></i> Carregando...");
                 btn.prop("disabled", true);
-                $.ajax({
-                    dataType: "json",
-                    url: "dev/removerPermissoes",
-                    data: {'change':true},
-                    success: function(e) {
-                        if(e.status) {
-                            btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-up'></i> Habilitar Permissões");
-                        } else {
-                            btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-down'></i> Desabilitar Permissões");
-                        }
-                        btn.prop("disabled", false);
+                post("dev/removerPermissoes", {'change':true}, function changeRemoverPerm(data, textStatus, jqXHR) {
+                    if(data.status) {
+                        btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-up'></i> Habilitar Permissões");
+                    } else {
+                        btn.html("<i class='fa fa-lg fa-fw fa-thumbs-o-down'></i> Desabilitar Permissões");
                     }
+                    btn.prop("disabled", false);
                 });
             }, false, "#sub-group-debug-lti ul");
 
@@ -76,7 +72,7 @@ function debugPermissionBtn(e) {
                     }, false, "#sub-group-debug-lti ul");
                     addLeftBtn('perm-list', "Permissões", "list-ul", function(){
                         $('#list-permissions').modal();
-                        var active = (($('#content .debug-permission:nth(0)').size())?$('#content .debug-permission:nth(0)').html().replace(/[()]+/g, "").replace(/<span[^>]+>/g, "").replace(/<\/span>/g, "|").replace(/(\|)?:.*/, ""):null);
+                        var active = (($('#content .debug-permission:nth(0)').size())?$('#content .debug-permission:nth(0)').html().replace(/[()]+/g, "").replace(/<span[^>]+>/g, "").replace(/<\/span>/g, "|").replace(/(\|)?:.*/, "").replace(/\n/, ""):null);
                         $('#list-permissions label.checkbox').removeClass('active');
                         if(active) {
                             if(active.match(/|/)) {
@@ -167,7 +163,8 @@ function formatDebugPermissionView() {
                 if($(item).hasClass("group")) {
                     $(item).prev().find("> a").prepend($(item));
                 } else {
-                    $(item).css('float', "none").css('margin-top', "5px").css('display', "inline-block").next().css('float', "none").css('margin-top', "5px").css('display', "inline-block");
+                    $(item).css('float', "none").css('margin-top', "5px").next().css('float', "none").css('margin-top', "5px").css('display', "inline-block");
+                    $(item)[0].style.setProperty('display', 'inline-block', 'important');
                 }
             }
             if($(item).parent().hasClass('btn')) {
@@ -216,54 +213,6 @@ function removeSession(key, fnc) {
     );
 }
 
-function post(url, data, success, showNofify) {
-    showNofify = showNofify || true
-    request(url, "POST", data, success, showNofify)
-}
-
-function get(url, data, success, showNofify) {
-    showNofify = showNofify || true
-    request(url, "GET", data, success, showNofify)
-}
-
-function request(url, method, data, success, showNofify) {
-    showNofify = showNofify || true
-    $.ajax({
-        url: url,
-        data: data,
-        method: method,
-        success: function (dados) {
-            if(typeof requestSuccess[success.name] === 'function') {
-                if(dados.hasOwnProperty("erro")) {
-                    requestSuccess[success.name](dados.erro, dados);
-                } else {
-                    requestSuccess[success.name](e);
-                }
-            }
-            if(success) success(dados);
-            if(showNofify) {
-                if (dados.erro) {
-                    $.bigBox({
-                        title: "Aviso!",
-                        content: dados.mensagem,
-                        color: "#C46A69",
-                        timeout: 7000,
-                        icon: "fa fa-warning shake animated"
-                    });
-                } else {
-                    $.smallBox({
-                        title: "Sucesso",
-                        content: dados.mensagem,
-                        color: "#739E73",
-                        timeout: 3000,
-                        icon: "fa fa-check"
-                    });
-                }
-            }
-        }
-    });
-}
-
 function updateSessionVar() {
     $.ajax({
         dataType: "json",
@@ -306,11 +255,142 @@ function addBtnViewPerm(e) {
 }
 
 function updateSessionVarCallback(e) {
+    addBtnUltimasAlteracoes(e);
     addBtnViewPerm(e);
     debugPermissionBtn(e);
     debugShowRequestPermission(e);
 }
 
-$('head').append('<link rel="stylesheet" type="text/css" href="https://s3.amazonaws.com/dev.lti.net.br/paulo/debug/style.css">');
-requestSuccess.changeShowPerm = function(){ location.reload(); };
-updateSessionVar();
+function addBtnUltimasAlteracoes() {
+    if(!isDebugMode) return;
+    execAfterAddBtn.showLog = function checkUltimasAlteracoes() {
+        $.ajax({
+            dataType: "json",
+            url: "dev/checkChanges",
+            beforeSend: function () {
+                $('#sub-debug-show-log a .info').html("(?)");
+                $('#debug-show-logModal .modal-header .info').html("(?)");
+            },
+            success: function (e) {
+                if (e.erro) {
+                    console.dir(e);
+                    $('#sub-debug-show-log a .info').html("(E)");
+                    $('#debug-show-logModal .modal-header .info').html("(E)");
+                    $('#debug-show-logModal .modal-header .info').data('info', "(E)");
+                } else {
+                    $('#sub-debug-show-log a .info').html("(" + e.changes + ")");
+                    $('#debug-show-logModal .modal-header .info').html("(" + e.changes + ")");
+                    $('#debug-show-logModal .modal-header .info').data('info', "(" + e.changes + ")");
+                }
+                if(e.changes != 0) {
+                    $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
+                    $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
+                }
+            }
+        });
+    };
+
+    addLeftBtn('show-log', "Ultimas Alterações <span class='info'>(-)</span>", "eye", function(e){
+        e.preventDefault();
+        $.ajax({
+            dataType: "json",
+            url: "dev/lastChanges",
+            beforeSend: function(){
+                $('#debug-show-logModal .modal-header .info').data("info", $('#debug-show-logModal .modal-header .info').html());
+                $('#debug-show-logModal .modal-header .info').html("(Carregando...)");
+                $('#debug-show-logModal .modal-body table').css('opacity', 0.6);
+                if(!$('#debug-show-logModal .modal-header .info').data('manter-dados')) {
+                    $('#debug-show-logModal .modal-body').html('Carregando...');
+                    $('#debug-show-logModal .modal-header .info').data('manter-dados', true);
+                    $('#debug-show-logModal .modal-body').data('ignore-clear', true);
+                }
+            },
+            success: function(e) {
+                $('#debug-show-logModal .modal-body table').css('opacity', 1);
+                $('#debug-show-logModal .modal-body').html("<table class='table' style='overflow: auto;display: block;'><thead></thead><tbody></tbody></table>");
+                var html = "<tr><th>New</th><th>Old</th><th>#</th><th>Usuário</th><th>Entidade</th><th>Entidade ID</th><th>IP</th><th>Ação</th><th>Data Registro</th></tr>";
+                $('#debug-show-logModal .modal-body table thead').append(html);
+                var countAlteracoes = 0;
+                $.each(e.entities, function(idx, item){
+                    var active = "";
+                    if(item.alteracaoRecente == "1") {
+                        if(item.usuario_id) active = " class='success'";
+                        else active = " class='warning'";
+                        countAlteracoes++;
+                    }
+                    var html = "<tr"+active+"><td><pre>"+JSON.stringify(item.new, null, 2)+"</pre></td><td><pre>"+JSON.stringify(item.old, null, 2)+"</pre></td><td>"+item.id+"</td><td>"+((item.usuario_id)?"Usuário":"Sistema")+"</td><td>"+item.entidade+"</td><td>"+item.entidadeId+"</td><td>"+item.ip+"</td><td>"+item.acao+"</td><td>"+item.dataRegistro+"</td></tr>";
+                    $('#debug-show-logModal .modal-body table tbody').append(html);
+                });
+                $('#debug-show-logModal .modal-dialog').css("width", "1500px");
+
+
+                if($('#debug-show-logModal .modal-header .info').data("info") != "("+countAlteracoes+")") {
+                    $('#sub-debug-show-log a .info').html("("+countAlteracoes+")");
+                    $('#debug-show-logModal .modal-header .info').data("info", "("+countAlteracoes+")");
+                    $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
+                    $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
+                }
+
+                $('#debug-show-logModal .modal-header .info').html($('#debug-show-logModal .modal-header .info').data("info"));
+            },
+            error: function(e) {
+                if(e.status == 404) leftBtnStatus("#sub-debug-show-log", false);
+            }
+        });
+    }, true, "#sub-group-debug-lti ul");
+}
+
+function addRefreshBtn() {
+    execAfterAddBtn.refresh = function checkUltimasAlteracoes() {
+        setTimeout(function(){ $('#sub-debug-refresh a').click(); }, 200);
+    };
+    addLeftBtn('refresh', "Refresh", "refresh", function(){
+        var param = "?";
+        var timestamp = new Date().getTime();
+        if(location.href.includes("?")) param = "&"
+        if(location.href.includes("?refresh") || location.href.includes("&refresh")) {
+            var regexp = new RegExp("refresh(.*)?(&)?");
+            location.href = location.href.replace(regexp, "refresh="+timestamp);
+        } else location.href += param+"refresh";
+    }, false, "#sub-group-debug-lti ul");
+}
+
+function addDebugBtn() {
+    addLeftGroupBtn('lti', "Debug", function(){
+        $('#sub-group-debug-lti').click(function(e){
+            var checkGroupClick = ($(e.target.parentElement).closest('li').attr('id') == "sub-group-debug-lti");
+            if(checkGroupClick) {
+                if($(this).hasClass('open')) {
+                    $('#sub-group-debug-lti').removeClass('open');
+                    $('#sub-group-debug-lti > ul').css('display', 'none');
+                    $('#sub-group-debug-lti > a em').addClass('fa-plus-square-o').removeClass('fa-minus-square-o');
+                } else {
+                    $('#sub-group-debug-lti').addClass('open');
+                    $('#sub-group-debug-lti > ul').css('display', 'block');
+                    $('#sub-group-debug-lti > a em').addClass('fa-minus-square-o').removeClass('fa-plus-square-o');
+                }
+            }
+        });
+        jQuery.each(jQuery._data(document, "events" )['click'], function(idx, item){
+            if(item.selector == 'nav a[href!="#"]') {
+                jQuery._data(document, "events" )['click'].splice(idx, 1);
+                $(document).on("click",'nav > ul > li:not(#sub-group-debug-lti) a[href!="#"]',function(a){a.preventDefault();var b=$(a.currentTarget);b.parent().hasClass("active")||b.attr("target")||($.root_.hasClass("mobile-view-activated")?($.root_.removeClass("hidden-menu"),$("html").removeClass("hidden-menu-mobile-lock"),window.setTimeout(function(){window.location.search?window.location.href=window.location.href.replace(window.location.search,"").replace(window.location.hash,"")+"#"+b.attr("href"):window.location.hash=b.attr("href")},150)):window.location.search?window.location.href=window.location.href.replace(window.location.search,"").replace(window.location.hash,"")+"#"+b.attr("href"):window.location.hash=b.attr("href"))});
+            }
+        });
+    });
+}
+
+function init(version) {
+    addDebugBtn();
+    addRefreshBtn();
+    get("https://raw.githubusercontent.com/pauloslash/debug-lti/master/style.css?v="+version, {}, function (e) {
+        $('head').append("<style>" + e + "</style>");
+    }, false, "text");
+    requestSuccess.changeShowPerm = function () {
+        setTimeout(function () { location.reload(); }, 1000);
+    };
+    requestSuccess.changeRemoverPerm = function () {
+        setTimeout(function () { $('#sub-debug-refresh a').click(); }, 200);
+    };
+    updateSessionVar();
+}

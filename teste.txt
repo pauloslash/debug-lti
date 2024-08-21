@@ -1,3 +1,3 @@
-// @require      http://localhost/debug-lti/template.js?teste=1
-// @require      http://localhost/debug-lti/helper.js?teste=1
-// @require      http://localhost/debug-lti/script.js?teste=1
+// @require      http://localhost/debug-lti/template.js?v=1
+// @require      http://localhost/debug-lti/helper.js?v=1
+// @require      http://localhost/debug-lti/script.js?v=1

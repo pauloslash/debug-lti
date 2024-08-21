@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Debug LTI
 // @namespace    http://paulo.lti.net.br/
-// @version      2024-08-20
+// @version      2024-08-21.1
 // @description  Ferramentas para auxiliar nos teste
 // @author       pauloslash
 // @updateURL    https://raw.githubusercontent.com/pauloslash/debug-lti/master/update.meta.js
@@ -12,6 +12,6 @@
 // @require      https://raw.githubusercontent.com/pauloslash/debug-lti/master/template.js
 // @require      https://raw.githubusercontent.com/pauloslash/debug-lti/master/helper.js
 // @require      https://raw.githubusercontent.com/pauloslash/debug-lti/master/script.js
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=sisgr.localhost
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=lti.net.br
 // @grant        none
 // ==/UserScript==
