@@ -65,6 +65,28 @@ function get(url, data, success, showNofify, dataType) {
     request(url, "GET", data, success, showNofify, dataType)
 }
 
+function escapeHtml(str) {
+    var map =  {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return str.replace(/[&<>"']/g, function(m) {return map[m];});
+}
+
+function decodeHtml(str) {
+    var map = {
+        '&amp;': '&',
+        '&lt;': '<',
+        '&gt;': '>',
+        '&quot;': '"',
+        '&#039;': "'"
+    };
+    return str.replace(/&amp;|&lt;|&gt;|&quot;|&#039;/g, function(m) {return map[m];});
+}
+
 function request(url, method, data, success, showNofify, dataType) {
     showNofify = ((typeof showNofify == 'undefined')?true:showNofify);
     dataType = dataType || "json";
@@ -103,4 +125,25 @@ function request(url, method, data, success, showNofify, dataType) {
             }
         }
     });
+}
+
+function getStorageData(key) {
+    return JSON.parse(localStorage.getItem("dev_"+key));
+}
+function setStorageData(key, value) {
+    localStorage.setItem("dev_"+key, JSON.stringify(value));
+}
+function rmStorageData(key) {
+    localStorage.removeItem("dev_"+key);
+}
+function clearStorageData(key) {
+    localStorage.clear();
+}
+
+function checkExpirate(data, minutos) {
+    const savedDate = new Date(data); // Exemplo de data salva
+    const currentDate = new Date();
+    const differenceInMs = currentDate - savedDate;
+    const differenceInHours = differenceInMs / (1000 * 60);
+    return !(differenceInHours < minutos);
 }

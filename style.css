@@ -46,3 +46,7 @@ label>.debug-permission { float: none; }
     float: none;
     margin-right: initial;
 }
+#debug-show-logModal table tbody tr td:nth-child(n+1) pre {
+    width: 460px;
+    white-space: pre-wrap;
+}

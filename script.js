@@ -232,6 +232,25 @@ function updateSessionVar() {
 
 function addBtnViewPerm(e) {
     var hDevMode = ((e.hasOwnProperty("dev_habilitar") && e.dev_habilitar)?e.dev_habilitar:false);
+    if(!$('#left-panel nav > ul > li:not(#sub-group-debug-lti):nth(0) a').attr('href').includes("/")) {
+        if(hDevMode) {
+            $.smallBox({
+                title: "DEV Mode",
+                content: "Habilitado",
+                color: "#739E73",
+                timeout: 3000,
+                icon: "fa fa-check"
+            });
+        } else {
+            $.smallBox({
+                title: "DEV Mode",
+                content: "Dísponivel",
+                color: "#dfb56c",
+                timeout: 3000,
+                icon: "fa fa-check"
+            });
+        }
+    }
     addLeftBtn('enable-dev-mode', ((hDevMode)?"Desabilitar DEV Mode":"Habilitar DEV Mode"), ((hDevMode)?"power-off":"bug"), function(){
         var btn = $(this);
         if(btn.text().trim() == "Habilitar DEV Mode") {
@@ -261,41 +280,76 @@ function updateSessionVarCallback(e) {
     debugShowRequestPermission(e);
 }
 
-function addBtnUltimasAlteracoes() {
-    if(!isDebugMode) return;
-    execAfterAddBtn.showLog = function checkUltimasAlteracoes() {
-        $.ajax({
-            dataType: "json",
-            url: "dev/checkChanges",
-            beforeSend: function () {
-                $('#sub-debug-show-log a .info').html("(?)");
-                $('#debug-show-logModal .modal-header .info').html("(?)");
-            },
-            success: function (e) {
-                if (e.erro) {
-                    console.dir(e);
-                    $('#sub-debug-show-log a .info').html("(E)");
-                    $('#debug-show-logModal .modal-header .info').html("(E)");
-                    $('#debug-show-logModal .modal-header .info').data('info', "(E)");
-                } else {
-                    $('#sub-debug-show-log a .info').html("(" + e.changes + ")");
-                    $('#debug-show-logModal .modal-header .info').html("(" + e.changes + ")");
-                    $('#debug-show-logModal .modal-header .info').data('info', "(" + e.changes + ")");
-                }
-                if(e.changes != 0) {
-                    $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
-                    $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
-                }
+function checkUltimasAlteracoes() {
+    $.ajax({
+        dataType: "json",
+        url: "dev/checkChanges",
+        beforeSend: function () {
+            $('#sub-debug-show-log a .info').html("(?)");
+            $('#debug-show-logModal .modal-header .info').html("(?)");
+        },
+        success: function (e) {
+            if (e.erro) {
+                console.dir(e);
+                $('#sub-debug-show-log a .info').html("(E)");
+                $('#debug-show-logModal .modal-header .info').html("(E)");
+                $('#debug-show-logModal .modal-header .info').data('info', "(E)");
+            } else {
+                $('#sub-debug-show-log a .info').html("(" + e.changes + ")");
+                $('#debug-show-logModal .modal-header .info').html("(" + e.changes + ")");
+                $('#debug-show-logModal .modal-header .info').data('info', "(" + e.changes + ")");
+                setStorageData("last_changes_check_datetime", new Date().toString());
+                setStorageData("last_changes_check_changes", e.changes);
             }
-        });
-    };
+            if(e.changes != 0) {
+                $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
+                $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
+            }
+        }
+    });
+}
 
-    addLeftBtn('show-log', "Ultimas Alterações <span class='info'>(-)</span>", "eye", function(e){
-        e.preventDefault();
+function mountTableChanges(entities) {
+    if(!$('#debug-show-logModal .modal-header .info').data("info"))
+        $('#debug-show-logModal .modal-header .info').data("info", $('#debug-show-logModal .modal-header .info').html());
+    $('#debug-show-logModal .modal-body table').css('opacity', 1);
+    $('#debug-show-logModal .modal-body').html("<table class='table' style='overflow: auto;display: block;'><thead></thead><tbody></tbody></table>");
+    var html = "<tr><th>New</th><th>Old</th><th>#</th><th>Usuário</th><th>Entidade</th><th>Entidade ID</th><th>IP</th><th>Ação</th><th>Data Registro</th></tr>";
+    $('#debug-show-logModal .modal-body table thead').append(html);
+    var countAlteracoes = 0;
+    $.each(entities, function(idx, item){
+        var active = "";
+        if(item.alteracaoRecente == "1") {
+            if(item.usuario_id) active = " class='success'";
+            else active = " class='warning'";
+            countAlteracoes++;
+        }
+        var html = "<tr"+active+"><td><pre>"+escapeHtml(JSON.stringify(item.new, null, 2))+"</pre></td><td><pre>"+escapeHtml(JSON.stringify(item.old, null, 2))+"</pre></td><td>"+item.id+"</td><td>"+((item.usuario_id)?"Usuário":"Sistema")+"</td><td>"+item.entidade+"</td><td>"+item.entidadeId+"</td><td>"+item.ip+"</td><td>"+item.acao+"</td><td>"+item.dataRegistro+"</td></tr>";
+        $('#debug-show-logModal .modal-body table tbody').append(html);
+    });
+    $('#debug-show-logModal .modal-dialog').css("width", "1500px");
+
+    if($('#debug-show-logModal .modal-header .info').data("info") != "("+countAlteracoes+")") {
+        $('#sub-debug-show-log a .info').html("("+countAlteracoes+")");
+        $('#debug-show-logModal .modal-header .info').data("info", "("+countAlteracoes+")");
+        $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
+        $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
+    }
+}
+
+function updateLastChanges() {
+    var listChanges = getStorageData("last_changes_list_changes");
+    var dateChanges = getStorageData("_last_changes_list_datetime");
+    if(listChanges) {
+        $('#debug-show-logModal .modal-body').data('ignore-clear', true);
+        mountTableChanges(listChanges);
+    }
+
+    if(checkExpirate(dateChanges, 5)) {
         $.ajax({
             dataType: "json",
             url: "dev/lastChanges",
-            beforeSend: function(){
+            beforeSend: function() {
                 $('#debug-show-logModal .modal-header .info').data("info", $('#debug-show-logModal .modal-header .info').html());
                 $('#debug-show-logModal .modal-header .info').html("(Carregando...)");
                 $('#debug-show-logModal .modal-body table').css('opacity', 0.6);
@@ -306,43 +360,37 @@ function addBtnUltimasAlteracoes() {
                 }
             },
             success: function(e) {
-                $('#debug-show-logModal .modal-body table').css('opacity', 1);
-                $('#debug-show-logModal .modal-body').html("<table class='table' style='overflow: auto;display: block;'><thead></thead><tbody></tbody></table>");
-                var html = "<tr><th>New</th><th>Old</th><th>#</th><th>Usuário</th><th>Entidade</th><th>Entidade ID</th><th>IP</th><th>Ação</th><th>Data Registro</th></tr>";
-                $('#debug-show-logModal .modal-body table thead').append(html);
-                var countAlteracoes = 0;
-                $.each(e.entities, function(idx, item){
-                    var active = "";
-                    if(item.alteracaoRecente == "1") {
-                        if(item.usuario_id) active = " class='success'";
-                        else active = " class='warning'";
-                        countAlteracoes++;
-                    }
-                    var html = "<tr"+active+"><td><pre>"+JSON.stringify(item.new, null, 2)+"</pre></td><td><pre>"+JSON.stringify(item.old, null, 2)+"</pre></td><td>"+item.id+"</td><td>"+((item.usuario_id)?"Usuário":"Sistema")+"</td><td>"+item.entidade+"</td><td>"+item.entidadeId+"</td><td>"+item.ip+"</td><td>"+item.acao+"</td><td>"+item.dataRegistro+"</td></tr>";
-                    $('#debug-show-logModal .modal-body table tbody').append(html);
-                });
-                $('#debug-show-logModal .modal-dialog').css("width", "1500px");
-
-
-                if($('#debug-show-logModal .modal-header .info').data("info") != "("+countAlteracoes+")") {
-                    $('#sub-debug-show-log a .info').html("("+countAlteracoes+")");
-                    $('#debug-show-logModal .modal-header .info').data("info", "("+countAlteracoes+")");
-                    $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
-                    $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
-                }
-
+                mountTableChanges(e.entities);
                 $('#debug-show-logModal .modal-header .info').html($('#debug-show-logModal .modal-header .info').data("info"));
+                setStorageData("last_changes_list_datetime", new Date().toString());
+                setStorageData("last_changes_list_changes", e.entities);
             },
             error: function(e) {
                 if(e.status == 404) leftBtnStatus("#sub-debug-show-log", false);
             }
         });
+    }
+}
+
+function addBtnUltimasAlteracoes() {
+    if(!isDebugMode) return;
+    execAfterAddBtn.showLog = function() {
+        checkUltimasAlteracoes();
+    };
+
+    addLeftBtn('show-log', "Ultimas Alterações <span class='info'>(-)</span>", "eye", function(e){
+        e.preventDefault();
+        updateLastChanges();
     }, true, "#sub-group-debug-lti ul");
 }
 
 function addRefreshBtn() {
     execAfterAddBtn.refresh = function checkUltimasAlteracoes() {
-        setTimeout(function(){ $('#sub-debug-refresh a').click(); }, 200);
+        setTimeout(function(){
+            if(!$('#left-panel nav > ul > li:not(#sub-group-debug-lti):nth(0) a').attr('href').includes("/")) {
+                $('#sub-debug-refresh a').click();
+            }
+        }, 200);
     };
     addLeftBtn('refresh', "Refresh", "refresh", function(){
         var param = "?";
@@ -380,10 +428,15 @@ function addDebugBtn() {
     });
 }
 
-function init(version) {
+function init(version, base_url) {
+    if(base_url) {
+        console.log("CUSTOM URL:"+base_url);
+    } else {
+        base_url = "https://raw.githubusercontent.com/pauloslash/debug-lti/master";
+    }
     addDebugBtn();
     addRefreshBtn();
-    get("https://raw.githubusercontent.com/pauloslash/debug-lti/master/style.css?v="+version, {}, function (e) {
+    get(base_url+"/style.css?v="+version, {}, function (e) {
         $('head').append("<style>" + e + "</style>");
     }, false, "text");
     requestSuccess.changeShowPerm = function () {
