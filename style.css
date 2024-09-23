@@ -50,3 +50,7 @@ label>.debug-permission { float: none; }
     width: 460px;
     white-space: pre-wrap;
 }
+
+.select2-container.select2-container--open {
+    z-index: 99999;
+}
