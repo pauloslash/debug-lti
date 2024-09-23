@@ -7,6 +7,7 @@ var sessionArray = null;
 var requestSuccess = {};
 var execAfterAddBtn = {}
 var isDebugMode = false;
+var intervalCheckChanges = 60;
 
 function foot_inner() {
     formatDebugPermissionView();
@@ -99,6 +100,19 @@ function debugPermissionBtn(e) {
                         $('#sub-debug-restart a').css('cursor', 'not-allowed');
                         $('#sub-debug-restart a').css('opacity', .5);
                     }
+                }
+            });
+
+            $.ajax({
+                dataType: "json",
+                url: "dev/changeUser",
+                success: function(e) {
+                    addLeftBtn('change-user', "Alterar Usuário", "users", function(){
+                        $('#list-users').modal();
+                    }, false, "#sub-group-debug-lti ul");
+                    $('#main').append(e.html);
+                    $('#list-users .user-list').select2();
+                    $('body').append(e.script);
                 }
             });
         }
@@ -281,32 +295,47 @@ function updateSessionVarCallback(e) {
 }
 
 function checkUltimasAlteracoes() {
-    $.ajax({
-        dataType: "json",
-        url: "dev/checkChanges",
-        beforeSend: function () {
-            $('#sub-debug-show-log a .info').html("(?)");
-            $('#debug-show-logModal .modal-header .info').html("(?)");
-        },
-        success: function (e) {
-            if (e.erro) {
-                console.dir(e);
-                $('#sub-debug-show-log a .info').html("(E)");
-                $('#debug-show-logModal .modal-header .info').html("(E)");
-                $('#debug-show-logModal .modal-header .info').data('info', "(E)");
-            } else {
-                $('#sub-debug-show-log a .info').html("(" + e.changes + ")");
-                $('#debug-show-logModal .modal-header .info').html("(" + e.changes + ")");
-                $('#debug-show-logModal .modal-header .info').data('info', "(" + e.changes + ")");
-                setStorageData("last_changes_check_datetime", new Date().toString());
-                setStorageData("last_changes_check_changes", e.changes);
-            }
-            if(e.changes != 0) {
-                $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
-                $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
-            }
+    var changes = getStorageData("last_changes_check_changes");
+    var dateChanges = getStorageData("last_changes_check_datetime");
+    if(changes && "("+changes+")" != $('#debug-show-logModal .modal-header .info').data('info')) {
+        console.log("UPDATE");
+        $('#sub-debug-show-log a .info').html("(" + changes + ")");
+        $('#debug-show-logModal .modal-header .info').html("(" + changes + ")");
+        $('#debug-show-logModal .modal-header .info').data('info', "(" + changes + ")");
+        if(changes != 0) {
+            $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
+            $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
         }
-    });
+    } else console.log("IGNORE");
+
+    if(checkExpirate(dateChanges, intervalCheckChanges)) {
+        $.ajax({
+            dataType: "json",
+            url: "dev/checkChanges",
+            beforeSend: function () {
+                $('#sub-debug-show-log a .info').html("(?)");
+                $('#debug-show-logModal .modal-header .info').html("(?)");
+            },
+            success: function (e) {
+                if (e.erro) {
+                    console.dir(e);
+                    $('#sub-debug-show-log a .info').html("(E)");
+                    $('#debug-show-logModal .modal-header .info').html("(E)");
+                    $('#debug-show-logModal .modal-header .info').data('info', "(E)");
+                } else {
+                    $('#sub-debug-show-log a .info').html("(" + e.changes + ")");
+                    $('#debug-show-logModal .modal-header .info').html("(" + e.changes + ")");
+                    $('#debug-show-logModal .modal-header .info').data('info', "(" + e.changes + ")");
+                    setStorageData("last_changes_check_datetime", new Date().toString());
+                    setStorageData("last_changes_check_changes", e.changes);
+                }
+                if(e.changes != 0) {
+                    $('#debug-show-logModal .modal-header .info').css('color', 'red').css('font-weight', 'bold');
+                    $('#sub-debug-show-log a .info').css('color', 'red').css('font-weight', 'bold');
+                }
+            }
+        });
+    }
 }
 
 function mountTableChanges(entities) {
@@ -339,13 +368,13 @@ function mountTableChanges(entities) {
 
 function updateLastChanges() {
     var listChanges = getStorageData("last_changes_list_changes");
-    var dateChanges = getStorageData("_last_changes_list_datetime");
-    if(listChanges) {
+    var dateChanges = getStorageData("last_changes_list_datetime");
+    if(listChanges && $('#debug-show-logModal').data('last-change') != dateChanges) {
         $('#debug-show-logModal .modal-body').data('ignore-clear', true);
         mountTableChanges(listChanges);
     }
 
-    if(checkExpirate(dateChanges, 5)) {
+    if(checkExpirate(dateChanges, intervalCheckChanges)) {
         $.ajax({
             dataType: "json",
             url: "dev/lastChanges",
@@ -362,7 +391,9 @@ function updateLastChanges() {
             success: function(e) {
                 mountTableChanges(e.entities);
                 $('#debug-show-logModal .modal-header .info').html($('#debug-show-logModal .modal-header .info').data("info"));
-                setStorageData("last_changes_list_datetime", new Date().toString());
+                var now = new Date().toString();
+                $('#debug-show-logModal').data('last-change', now);
+                setStorageData("last_changes_list_datetime", now);
                 setStorageData("last_changes_list_changes", e.entities);
             },
             error: function(e) {
@@ -428,6 +459,12 @@ function addDebugBtn() {
     });
 }
 
+function initInterval() {
+    setInterval(function(){
+        checkUltimasAlteracoes();
+    }, 1000 * 60);
+}
+
 function init(version, base_url) {
     if(base_url) {
         console.log("CUSTOM URL:"+base_url);
@@ -446,4 +483,5 @@ function init(version, base_url) {
         setTimeout(function () { $('#sub-debug-refresh a').click(); }, 200);
     };
     updateSessionVar();
+    initInterval();
 }
