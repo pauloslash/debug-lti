@@ -128,7 +128,13 @@ function request(url, method, data, success, showNofify, dataType) {
 }
 
 function getStorageData(key) {
-    return JSON.parse(localStorage.getItem("dev_"+key));
+    var str = localStorage.getItem("dev_"+key);
+    if(str == 'undefined') {
+        console.log("Stop interval");
+        clearInterval(interval);
+    } else {
+        return JSON.parse(str);
+    }
 }
 function setStorageData(key, value) {
     localStorage.setItem("dev_"+key, JSON.stringify(value));
